@@ -142,7 +142,7 @@
         let history = [];
         let currentIndex = -1;
         
-        function navigate() {
+        async function navigate() {
             const url = document.getElementById('url').value.trim();
             if (!url) return;
             
@@ -156,7 +156,19 @@
             } else if (url === 'dashboard.cats') {
                 document.getElementById('viewer').src = '/dashboard.html';
             } else {
-                document.getElementById('viewer').src = '/?domain=' + url;
+                // Look up the siteId and load the actual site
+                try {
+                    const response = await fetch(`/api/get-site/${url}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        document.getElementById('viewer').src = `/domains/${data.siteId}/`;
+                    } else {
+                        alert('Domain not registered! Visit register.cats to claim it.');
+                    }
+                } catch (error) {
+                    alert('Error loading site');
+                }
             }
             
             history = history.slice(0, currentIndex + 1);
@@ -195,13 +207,12 @@
             try {
                 const iframeUrl = this.contentWindow.location.href;
                 if (iframeUrl.includes('.cats')) {
-                    const urlParams = new URL(iframeUrl).searchParams;
-                    const domain = urlParams.get('domain');
-                    if (domain) {
-                        document.getElementById('url').value = domain;
-                    }
+                    const domain = new URL(iframeUrl).hostname;
+                    document.getElementById('url').value = domain;
                 }
-            } catch (e) {}
+            } catch (e) {
+                // Cross-origin restriction, that's normal
+            }
         });
         
         window.addEventListener('message', function(event) {
