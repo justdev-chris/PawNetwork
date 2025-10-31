@@ -10,31 +10,35 @@
             color: white; 
         }
         .header { 
-            background: #ff6b81; 
+            background: #1a1a1a; 
             padding: 15px; 
             text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            border-bottom: 1px solid #2a2a2a;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 10px;
+            gap: 10px;
         }
         .address-bar { 
-            width: 60%; 
+            width: 400px; 
             padding: 12px; 
-            margin: 0 10px; 
-            border: none; 
-            border-radius: 25px;
-            font-size: 16px;
+            border: 1px solid #3a3a3a; 
+            border-radius: 6px;
+            background: #0f0f0f;
+            color: white;
+            font-size: 14px;
         }
         button { 
             padding: 12px 20px; 
-            background: #333; 
+            background: #ff6b81; 
             color: white; 
             border: none; 
-            border-radius: 25px; 
+            border-radius: 6px; 
             cursor: pointer;
-            font-size: 16px;
-            margin: 0 5px;
-        }
-        button:hover {
-            background: #555;
+            font-size: 14px;
         }
         iframe { 
             width: 100%; 
@@ -42,42 +46,46 @@
             border: none; 
             background: white; 
         }
-        .controls {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-top: 10px;
-        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1 style="margin: 0;">🐾 PawNetwork Browser</h1>
         <div class="controls">
-            <input class="address-bar" id="url" placeholder="Enter .cats domain (e.g., neko.cats)" value="register.cats">
+            <input class="address-bar" id="url" placeholder="Enter .cats domain (e.g., neko.cats)">
             <button onclick="navigate()">Go</button>
             <button onclick="home()">Home</button>
         </div>
     </div>
-    <iframe id="viewer" src=""></iframe>
+    <iframe id="viewer" src="about:blank"></iframe>
 
     <script>
+        // Listen for messages from iframe
+        window.addEventListener('message', function(event) {
+            if (event.data.startsWith('navigate:')) {
+                const domain = event.data.replace('navigate:', '');
+                document.getElementById('url').value = domain;
+                navigateTo(domain);
+            }
+        });
+
+        function navigateTo(domain) {
+            document.getElementById('viewer').src = domain;
+        }
+
         function navigate() {
             const url = document.getElementById('url').value;
             if (!url.endsWith('.cats')) {
                 alert('Only .cats domains allowed in PawNetwork!');
                 return;
             }
-            document.getElementById('viewer').src = url;
+            navigateTo(url);
         }
         
         function home() {
             document.getElementById('url').value = 'register.cats';
-            navigate();
+            navigateTo('register.cats');
         }
-        
-        // Auto-navigate to register.cats on load
-        window.onload = navigate;
         
         // Update address bar when iframe navigates
         document.getElementById('viewer').addEventListener('load', function() {
