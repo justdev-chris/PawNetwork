@@ -121,9 +121,54 @@ app.get('/register.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'register.html'));
 });
 
+app.get('/dashboard.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
 app.get('*', (req, res) => {
   const host = req.headers.host;
   const file = req.path.substring(1) || 'index.html';
+  const queryDomain = req.query.domain;
+  
+  if (queryDomain && queryDomain.endsWith('.cats')) {
+    if (sites[queryDomain] && sites[queryDomain].files[file]) {
+      return res.send(sites[queryDomain].files[file]);
+    } else if (sites[queryDomain] && sites[queryDomain].files['index.html']) {
+      return res.send(sites[queryDomain].files['index.html']);
+    } else if (sites[queryDomain]) {
+      const fileList = Object.keys(sites[queryDomain].files).join(', ');
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>${queryDomain}</title></head>
+        <body>
+          <h1>${queryDomain}</h1>
+          <p>No index.html found. Files: ${fileList}</p>
+        </body>
+        </html>
+      `);
+    } else {
+      return res.status(404).send(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>404</title></head>
+        <body>
+          <h1>😿 404 - ${queryDomain} not found</h1>
+          <p>This .cats domain isn't registered yet.</p>
+          <p><a href="#" onclick="window.parent.postMessage('navigate:register.cats', '*')">Register it now!</a></p>
+        </body>
+        </html>
+      `);
+    }
+  }
+  
+  if (host === 'register.cats') {
+    return res.sendFile(path.join(__dirname, 'public', 'register.html'));
+  }
+  
+  if (host === 'dashboard.cats') {
+    return res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+  }
   
   if (host && host.endsWith('.cats')) {
     if (sites[host] && sites[host].files[file]) {
