@@ -117,13 +117,13 @@ app.get('/api/my-sites', requireAuth, (req, res) => {
   res.json({ sites: userSites });
 });
 
+app.get('/register.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'register.html'));
+});
+
 app.get('*', (req, res) => {
   const host = req.headers.host;
   const file = req.path.substring(1) || 'index.html';
-  
-  if (host === 'register.cats') {
-    return res.sendFile(path.join(__dirname, 'public', 'register.html'));
-  }
   
   if (host && host.endsWith('.cats')) {
     if (sites[host] && sites[host].files[file]) {
