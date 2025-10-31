@@ -3,100 +3,210 @@
 <head>
     <title>PawNetwork Browser</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body { 
-            font-family: Arial, sans-serif; 
-            margin: 0; 
-            background: #1a1a1a; 
-            color: white; 
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 100%);
+            color: #e1e5e9;
+            height: 100vh;
+            overflow: hidden;
         }
+        
         .header { 
-            background: #1a1a1a; 
-            padding: 15px; 
-            text-align: center;
-            border-bottom: 1px solid #2a2a2a;
+            background: rgba(22, 22, 24, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid #2a2d32;
+            padding: 16px 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
         }
-        .controls {
+        
+        .browser-container {
             display: flex;
-            justify-content: center;
             align-items: center;
-            margin-top: 10px;
-            gap: 10px;
+            gap: 16px;
+            max-width: 1200px;
+            margin: 0 auto;
         }
-        .address-bar { 
-            width: 400px; 
-            padding: 12px; 
-            border: 1px solid #3a3a3a; 
-            border-radius: 6px;
-            background: #0f0f0f;
-            color: white;
-            font-size: 14px;
+        
+        .browser-brand {
+            font-size: 20px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ff6b81, #ffa726);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
         }
-        button { 
-            padding: 12px 20px; 
-            background: #ff6b81; 
-            color: white; 
-            border: none; 
-            border-radius: 6px; 
+        
+        .nav-controls {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .nav-btn {
+            padding: 10px 16px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            color: #e1e5e9;
             cursor: pointer;
             font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
+        
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+        
+        .address-container {
+            flex: 1;
+            position: relative;
+        }
+        
+        .address-bar { 
+            width: 100%;
+            padding: 14px 20px;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1.5px solid rgba(255, 255, 255, 0.15);
+            border-radius: 14px;
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: 500;
+            outline: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .address-bar:focus {
+            border-color: #ff6b81;
+            background: rgba(255, 107, 129, 0.1);
+            box-shadow: 0 0 0 4px rgba(255, 107, 129, 0.15);
+        }
+        
+        .address-bar::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+        
+        .go-btn {
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #ff6b81 0%, #ff4757 100%);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 20px rgba(255, 107, 129, 0.3);
+        }
+        
+        .go-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(255, 107, 129, 0.4);
+        }
+        
         iframe { 
             width: 100%; 
-            height: calc(100vh - 80px); 
+            height: calc(100vh - 80px);
             border: none; 
-            background: white; 
+            background: #ffffff;
         }
     </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="header">
-        <h1 style="margin: 0;">🐾 PawNetwork Browser</h1>
-        <div class="controls">
-            <input class="address-bar" id="url" placeholder="Enter .cats domain (e.g., neko.cats)">
-            <button onclick="navigate()">Go</button>
-            <button onclick="home()">Home</button>
+        <div class="browser-container">
+            <div class="browser-brand">PAWNETWORK</div>
+            <div class="nav-controls">
+                <button class="nav-btn" onclick="home()">⌂</button>
+                <button class="nav-btn" onclick="back()">←</button>
+                <button class="nav-btn" onclick="forward()">→</button>
+            </div>
+            <div class="address-container">
+                <input class="address-bar" id="url" placeholder="Enter .cats domain (e.g., neko.cats)">
+            </div>
+            <button class="go-btn" onclick="navigate()">GO</button>
         </div>
     </div>
     <iframe id="viewer" src="about:blank"></iframe>
 
     <script>
-        // Listen for messages from iframe
-        window.addEventListener('message', function(event) {
-            if (event.data.startsWith('navigate:')) {
-                const domain = event.data.replace('navigate:', '');
-                document.getElementById('url').value = domain;
-                navigateTo(domain);
-            }
-        });
-
-        function navigateTo(domain) {
-            document.getElementById('viewer').src = domain;
-        }
-
+        let history = [];
+        let currentIndex = -1;
+        
         function navigate() {
-            const url = document.getElementById('url').value;
+            const url = document.getElementById('url').value.trim();
+            if (!url) return;
+            
             if (!url.endsWith('.cats')) {
-                alert('Only .cats domains allowed in PawNetwork!');
+                alert('PawNetwork only supports .cats domains');
                 return;
             }
-            navigateTo(url);
+            
+            if (url === 'register.cats') {
+                document.getElementById('viewer').src = '/register.html';
+            } else {
+                document.getElementById('viewer').src = '/?domain=' + url;
+            }
+            
+            history = history.slice(0, currentIndex + 1);
+            history.push(url);
+            currentIndex = history.length - 1;
         }
         
         function home() {
             document.getElementById('url').value = 'register.cats';
-            navigateTo('register.cats');
+            navigate();
         }
         
-        // Update address bar when iframe navigates
+        function back() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                const url = history[currentIndex];
+                document.getElementById('url').value = url;
+                navigate();
+            }
+        }
+        
+        function forward() {
+            if (currentIndex < history.length - 1) {
+                currentIndex++;
+                const url = history[currentIndex];
+                document.getElementById('url').value = url;
+                navigate();
+            }
+        }
+        
+        document.getElementById('url').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') navigate();
+        });
+        
         document.getElementById('viewer').addEventListener('load', function() {
             try {
                 const iframeUrl = this.contentWindow.location.href;
                 if (iframeUrl.includes('.cats')) {
-                    const domain = new URL(iframeUrl).hostname;
-                    document.getElementById('url').value = domain;
+                    const urlParams = new URL(iframeUrl).searchParams;
+                    const domain = urlParams.get('domain');
+                    if (domain) {
+                        document.getElementById('url').value = domain;
+                    }
                 }
-            } catch (e) {
-                // Cross-origin restriction, ignore
+            } catch (e) {}
+        });
+        
+        window.addEventListener('message', function(event) {
+            if (event.data.startsWith('navigate:')) {
+                const domain = event.data.replace('navigate:', '');
+                document.getElementById('url').value = domain;
+                navigate();
             }
         });
     </script>
