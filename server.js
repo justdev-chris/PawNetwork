@@ -25,7 +25,6 @@ function requireAuth(req, res, next) {
   }
 }
 
-// Track site views
 app.use((req, res, next) => {
   const host = req.headers.host;
   if (host && host.endsWith('.cats') && sites[host]) {
@@ -34,7 +33,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Auth endpoints
 app.post('/api/signup', upload.any(), async (req, res) => {
   const { email, password, domain } = req.body;
   
@@ -77,7 +75,6 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Site management
 app.post('/api/update-site', requireAuth, upload.any(), (req, res) => {
   const { domain } = req.body;
   if (sites[domain].owner !== req.user) {
@@ -120,7 +117,6 @@ app.get('/api/my-sites', requireAuth, (req, res) => {
   res.json({ sites: userSites });
 });
 
-// Serve sites
 app.get('*', (req, res) => {
   const host = req.headers.host;
   const file = req.path.substring(1) || 'index.html';
@@ -134,8 +130,33 @@ app.get('*', (req, res) => {
       return res.send(sites[host].files[file]);
     } else if (sites[host] && sites[host].files['index.html']) {
       return res.send(sites[host].files['index.html']);
+    } else {
+      return res.status(404).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>404 - Site Not Found</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; background: #fff5f5; text-align: center; }
+                .container { max-width: 600px; margin: 0 auto; }
+                h1 { color: #ff6b81; font-size: 48px; margin: 20px 0; }
+                .cat { font-size: 80px; margin: 20px 0; }
+                .domain { background: #ff6b81; color: white; padding: 5px 10px; border-radius: 5px; }
+                a { color: #ff6b81; text-decoration: none; font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="cat">😿</div>
+                <h1>404</h1>
+                <h2>This .cats site doesn't exist yet!</h2>
+                <p>The domain <span class="domain">${host}</span> isn't registered.</p>
+                <p>Visit <a href="#" onclick="window.parent.postMessage('navigate:register.cats', '*')">register.cats</a> to claim it!</p>
+            </div>
+        </body>
+        </html>
+      `);
     }
-    return res.send('<h1>404 - .cats site not found</h1>');
   }
   
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
