@@ -153,6 +153,8 @@
             
             if (url === 'register.cats') {
                 document.getElementById('viewer').src = '/register.html';
+            } else if (url === 'dashboard.cats') {
+                document.getElementById('viewer').src = '/dashboard.html';
             } else {
                 document.getElementById('viewer').src = '/?domain=' + url;
             }
