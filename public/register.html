@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PawNetwork - Register</title>
+    <style>
+        body { font-family: Arial; margin: 40px; background: #fff5f5; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .tab { display: none; }
+        .active { display: block; }
+        .tab-buttons { margin: 20px 0; }
+        .tab-buttons button { padding: 10px 20px; margin-right: 10px; }
+        input, button, textarea { padding: 10px; margin: 5px 0; width: 100%; }
+        button { background: #ff6b81; color: white; border: none; cursor: pointer; }
+        #dashboard { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐾 PawNetwork</h1>
+        
+        <div class="tab-buttons">
+            <button onclick="showTab('login')">Login</button>
+            <button onclick="showTab('signup')">Sign Up</button>
+        </div>
+
+        <div id="login" class="tab">
+            <h3>Login</h3>
+            <input type="email" id="loginEmail" placeholder="Email">
+            <input type="password" id="loginPassword" placeholder="Password">
+            <button onclick="login()">Login</button>
+            <div id="loginResult"></div>
+        </div>
+
+        <div id="signup" class="tab">
+            <h3>Create Account & Site</h3>
+            <input type="email" id="signupEmail" placeholder="Email">
+            <input type="password" id="signupPassword" placeholder="Password">
+            <input type="text" id="domain" placeholder="yourname.cats">
+            
+            <h4>Upload Website Files</h4>
+            <input type="file" id="zipUpload" accept=".zip">
+            <small>Or upload individual files:</small>
+            <input type="file" id="fileUpload" multiple>
+            
+            <button onclick="signup()">Create Account & Site</button>
+            <div id="signupResult"></div>
+        </div>
+
+        <div id="dashboard" class="tab">
+            <h3>Your Dashboard</h3>
+            <div id="sitesList"></div>
+            <button onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <script>
+        let authToken = localStorage.getItem('pawToken');
+        if (authToken) showDashboard();
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                authToken = result.token;
+                localStorage.setItem('pawToken', authToken);
+                showDashboard();
+            } else {
+                document.getElementById('loginResult').innerHTML = `<p style="color: red;">${result.error}</p>`;
+            }
+        }
+
+        async function signup() {
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+            const domain = document.getElementById('domain').value;
+            const zipFile = document.getElementById('zipUpload').files[0];
+            const files = document.getElementById('fileUpload').files;
+            
+            const formData = new FormData();
+            formData.append('email', email);
+            formData.append('password', password);
+            formData.append('domain', domain);
+            
+            if (zipFile) formData.append('zip', zipFile);
+            Array.from(files).forEach(file => formData.append('files', file));
+            
+            const response = await fetch('/api/signup', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                authToken = result.token;
+                localStorage.setItem('pawToken', authToken);
+                showDashboard();
+            } else {
+                document.getElementById('signupResult').innerHTML = `<p style="color: red;">${result.error}</p>`;
+            }
+        }
+
+        async function showDashboard() {
+            const response = await fetch('/api/my-sites', {
+                headers: { 'Authorization': authToken }
+            });
+            const result = await response.json();
+            
+            let html = '<h4>Your Sites:</h4>';
+            result.sites.forEach(site => {
+                html += `<div>
+                    <strong>${site.domain}</strong> - ${site.views} views
+                    <button onclick="updateSite('${site.domain}')">Update</button>
+                    <button onclick="viewAnalytics('${site.domain}')">Analytics</button>
+                </div>`;
+            });
+            
+            document.getElementById('sitesList').innerHTML = html;
+            document.getElementById('dashboard').classList.add('active');
+            document.querySelectorAll('.tab:not(#dashboard)').forEach(tab => tab.classList.remove('active'));
+        }
+
+        function logout() {
+            localStorage.removeItem('pawToken');
+            authToken = null;
+            showTab('login');
+        }
+
+        showTab('login');
+    </script>
+</body>
+</html>
