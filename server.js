@@ -1,12 +1,19 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const AdmZip = require('adm-zip');
 const bcrypt = require('bcryptjs');
 
 const app = express();
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
+
+// Ensure directories exist
+const domainsDir = path.join(__dirname, 'domains');
+const dataDir = path.join(__dirname, 'data');
+if (!fs.existsSync(domainsDir)) fs.mkdirSync(domainsDir, { recursive: true });
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 let users = {};
 let sites = {};
@@ -29,10 +36,46 @@ app.use((req, res, next) => {
   const host = req.headers.host;
   if (host && host.endsWith('.cats') && sites[host]) {
     analytics[host] = (analytics[host] || 0) + 1;
+    saveData();
   }
   next();
 });
 
+// File system storage functions
+function saveData() {
+  try {
+    fs.writeFileSync(path.join(dataDir, 'users.json'), JSON.stringify(users));
+    fs.writeFileSync(path.join(dataDir, 'sites.json'), JSON.stringify(sites));
+    fs.writeFileSync(path.join(dataDir, 'analytics.json'), JSON.stringify(analytics));
+  } catch (error) {
+    console.error('Error saving data:', error);
+  }
+}
+
+function loadData() {
+  try {
+    if (fs.existsSync(path.join(dataDir, 'users.json'))) {
+      users = JSON.parse(fs.readFileSync(path.join(dataDir, 'users.json')));
+    }
+    if (fs.existsSync(path.join(dataDir, 'sites.json'))) {
+      sites = JSON.parse(fs.readFileSync(path.join(dataDir, 'sites.json')));
+    }
+    if (fs.existsSync(path.join(dataDir, 'analytics.json'))) {
+      analytics = JSON.parse(fs.readFileSync(path.join(dataDir, 'analytics.json')));
+    }
+  } catch (error) {
+    console.log('No existing data found, starting fresh');
+  }
+}
+
+function generateSiteId() {
+  return Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
+}
+
+// Load data on startup
+loadData();
+
+// API Routes
 app.post('/api/signup', upload.any(), async (req, res) => {
   const { email, password, domain } = req.body;
   
@@ -46,22 +89,38 @@ app.post('/api/signup', upload.any(), async (req, res) => {
   const hashedPassword = await bcrypt.hash(password, 10);
   users[email] = { password: hashedPassword, domains: [domain] };
   
-  const files = {};
+  const siteId = generateSiteId();
+  const domainDir = path.join(domainsDir, siteId);
+  fs.mkdirSync(domainDir, { recursive: true });
+  
+  // Save uploaded files to file system
   req.files.forEach(file => {
     if (file.fieldname === 'zip') {
       const zip = new AdmZip(file.buffer);
       zip.getEntries().forEach(entry => {
         if (!entry.isDirectory) {
-          files[entry.entryName] = zip.readFile(entry).toString();
+          const filePath = path.join(domainDir, entry.entryName);
+          const dir = path.dirname(filePath);
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+          }
+          fs.writeFileSync(filePath, zip.readFile(entry));
         }
       });
     } else {
-      files[file.originalname] = file.buffer.toString();
+      const filePath = path.join(domainDir, file.originalname);
+      fs.writeFileSync(filePath, file.buffer);
     }
   });
   
-  sites[domain] = { owner: email, files, created: new Date() };
-  res.json({ success: true, token: email });
+  sites[domain] = { 
+    owner: email, 
+    siteId,
+    created: new Date() 
+  };
+  
+  saveData();
+  res.json({ success: true, token: email, siteId, domain });
 });
 
 app.post('/api/login', async (req, res) => {
@@ -77,32 +136,47 @@ app.post('/api/login', async (req, res) => {
 
 app.post('/api/update-site', requireAuth, upload.any(), (req, res) => {
   const { domain } = req.body;
-  if (sites[domain].owner !== req.user) {
+  if (!sites[domain] || sites[domain].owner !== req.user) {
     return res.status(403).json({ error: 'Not your site' });
   }
   
-  const files = {};
+  const siteId = sites[domain].siteId;
+  const domainDir = path.join(domainsDir, siteId);
+  
+  // Clear existing files
+  if (fs.existsSync(domainDir)) {
+    fs.rmSync(domainDir, { recursive: true });
+    fs.mkdirSync(domainDir, { recursive: true });
+  }
+  
+  // Save new files
   req.files.forEach(file => {
     if (file.fieldname === 'zip') {
       const zip = new AdmZip(file.buffer);
       zip.getEntries().forEach(entry => {
         if (!entry.isDirectory) {
-          files[entry.entryName] = zip.readFile(entry).toString();
+          const filePath = path.join(domainDir, entry.entryName);
+          const dir = path.dirname(filePath);
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+          }
+          fs.writeFileSync(filePath, zip.readFile(entry));
         }
       });
     } else {
-      files[file.originalname] = file.buffer.toString();
+      const filePath = path.join(domainDir, file.originalname);
+      fs.writeFileSync(filePath, file.buffer);
     }
   });
   
-  sites[domain].files = files;
   sites[domain].updated = new Date();
+  saveData();
   res.json({ success: true });
 });
 
 app.get('/api/analytics/:domain', requireAuth, (req, res) => {
   const domain = req.params.domain;
-  if (sites[domain].owner !== req.user) {
+  if (!sites[domain] || sites[domain].owner !== req.user) {
     return res.status(403).json({ error: 'Not your site' });
   }
   res.json({ views: analytics[domain] || 0 });
@@ -111,12 +185,41 @@ app.get('/api/analytics/:domain', requireAuth, (req, res) => {
 app.get('/api/my-sites', requireAuth, (req, res) => {
   const userSites = users[req.user].domains.map(domain => ({
     domain,
+    siteId: sites[domain].siteId,
     views: analytics[domain] || 0,
     created: sites[domain].created
   }));
   res.json({ sites: userSites });
 });
 
+// Domain file serving
+app.get('/domains/:siteId/*', (req, res) => {
+  const siteId = req.params.siteId;
+  const filePath = req.params[0] || 'index.html';
+  const fullPath = path.join(domainsDir, siteId, filePath);
+  
+  if (fs.existsSync(fullPath) && !fs.statSync(fullPath).isDirectory()) {
+    return res.sendFile(fullPath);
+  } else {
+    const indexPath = path.join(domainsDir, siteId, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      return res.sendFile(indexPath);
+    } else {
+      return res.status(404).send(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>404</title></head>
+        <body>
+          <h1>😿 404 - File not found</h1>
+          <p><a href="#" onclick="window.parent.postMessage('navigate:register.cats', '*')">Create a site</a></p>
+        </body>
+        </html>
+      `);
+    }
+  }
+});
+
+// Static pages
 app.get('/register.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'register.html'));
 });
@@ -125,28 +228,15 @@ app.get('/dashboard.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
+// Main routing
 app.get('*', (req, res) => {
   const host = req.headers.host;
-  const file = req.path.substring(1) || 'index.html';
   const queryDomain = req.query.domain;
   
+  // Handle ?domain= queries - redirect to clean URLs
   if (queryDomain && queryDomain.endsWith('.cats')) {
-    if (sites[queryDomain] && sites[queryDomain].files[file]) {
-      return res.send(sites[queryDomain].files[file]);
-    } else if (sites[queryDomain] && sites[queryDomain].files['index.html']) {
-      return res.send(sites[queryDomain].files['index.html']);
-    } else if (sites[queryDomain]) {
-      const fileList = Object.keys(sites[queryDomain].files).join(', ');
-      return res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head><title>${queryDomain}</title></head>
-        <body>
-          <h1>${queryDomain}</h1>
-          <p>No index.html found. Files: ${fileList}</p>
-        </body>
-        </html>
-      `);
+    if (sites[queryDomain]) {
+      return res.redirect(`/domains/${sites[queryDomain].siteId}/`);
     } else {
       return res.status(404).send(`
         <!DOCTYPE html>
@@ -154,7 +244,6 @@ app.get('*', (req, res) => {
         <head><title>404</title></head>
         <body>
           <h1>😿 404 - ${queryDomain} not found</h1>
-          <p>This .cats domain isn't registered yet.</p>
           <p><a href="#" onclick="window.parent.postMessage('navigate:register.cats', '*')">Register it now!</a></p>
         </body>
         </html>
@@ -171,10 +260,8 @@ app.get('*', (req, res) => {
   }
   
   if (host && host.endsWith('.cats')) {
-    if (sites[host] && sites[host].files[file]) {
-      return res.send(sites[host].files[file]);
-    } else if (sites[host] && sites[host].files['index.html']) {
-      return res.send(sites[host].files['index.html']);
+    if (sites[host]) {
+      return res.redirect(`/domains/${sites[host].siteId}/`);
     } else {
       return res.status(404).send(`
         <!DOCTYPE html>
