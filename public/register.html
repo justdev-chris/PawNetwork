@@ -155,6 +155,33 @@
             border-color: #ff6b81;
             background: rgba(255, 107, 129, 0.05);
         }
+        
+        .progress-container {
+            margin-top: 10px;
+            display: none;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #ff6b81, #ff4757);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-text {
+            text-align: center;
+            font-size: 12px;
+            color: #718096;
+            margin-top: 5px;
+        }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
 </head>
@@ -203,6 +230,12 @@
                     <p style="font-size: 12px; color: #718096; margin-top: 8px;">HTML, CSS, JS, images, or ZIP folder</p>
                 </div>
                 <input type="file" id="fileUpload" multiple style="display: none;">
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-text" id="progressText">0%</div>
+                </div>
             </div>
             <button onclick="signup()">Create Account & Site</button>
             <div id="signupResult"></div>
@@ -247,6 +280,12 @@
             const domain = document.getElementById('domain').value + '.cats';
             const files = document.getElementById('fileUpload').files;
             
+            if (files.length === 0) {
+                document.getElementById('signupResult').innerHTML = 
+                    `<div class="error">Please upload at least one file</div>`;
+                return;
+            }
+            
             const formData = new FormData();
             formData.append('email', email);
             formData.append('password', password);
@@ -256,20 +295,44 @@
                 formData.append('files', file);
             }
             
-            const response = await fetch('/api/signup', {
-                method: 'POST',
-                body: formData
-            });
+            const progressContainer = document.getElementById('progressContainer');
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            progressContainer.style.display = 'block';
             
-            const result = await response.json();
-            if (result.success) {
-                authToken = result.token;
-                localStorage.setItem('pawToken', authToken);
+            try {
+                const xhr = new XMLHttpRequest();
+                
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percent = (e.loaded / e.total) * 100;
+                        progressFill.style.width = percent + '%';
+                        progressText.textContent = Math.round(percent) + '%';
+                    }
+                });
+                
+                xhr.addEventListener('load', () => {
+                    const result = JSON.parse(xhr.responseText);
+                    if (result.success) {
+                        authToken = result.token;
+                        localStorage.setItem('pawToken', authToken);
+                        document.getElementById('signupResult').innerHTML = 
+                            `<div class="success">✅ Success! Your site is live at ${domain}</div>`;
+                        progressContainer.style.display = 'none';
+                    } else {
+                        document.getElementById('signupResult').innerHTML = 
+                            `<div class="error">${result.error}</div>`;
+                        progressContainer.style.display = 'none';
+                    }
+                });
+                
+                xhr.open('POST', '/api/signup');
+                xhr.send(formData);
+                
+            } catch (error) {
                 document.getElementById('signupResult').innerHTML = 
-                    `<div class="success">✅ Success! Your site is live at ${domain}</div>`;
-            } else {
-                document.getElementById('signupResult').innerHTML = 
-                    `<div class="error">${result.error}</div>`;
+                    `<div class="error">Upload failed: ${error.message}</div>`;
+                progressContainer.style.display = 'none';
             }
         }
         
@@ -277,7 +340,6 @@
             window.parent.postMessage('navigate:dashboard.cats', '*');
         }
         
-        // Drag and drop file upload
         const fileUpload = document.getElementById('fileUpload');
         const fileUploadArea = document.querySelector('.file-upload');
         
@@ -296,6 +358,12 @@
             e.preventDefault();
             fileUpload.files = e.dataTransfer.files;
             fileUploadArea.innerHTML = `<p>📁 ${e.dataTransfer.files.length} file(s) selected</p>`;
+        });
+        
+        fileUpload.addEventListener('change', () => {
+            if (fileUpload.files.length > 0) {
+                fileUploadArea.innerHTML = `<p>📁 ${fileUpload.files.length} file(s) selected</p>`;
+            }
         });
     </script>
 </body>
