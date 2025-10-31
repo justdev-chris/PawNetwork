@@ -134,6 +134,22 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// NEW: API to get siteId for a domain
+app.get('/api/get-site/:domain', (req, res) => {
+  const domain = req.params.domain;
+  if (sites[domain]) {
+    res.json({ 
+      success: true, 
+      siteId: sites[domain].siteId 
+    });
+  } else {
+    res.json({ 
+      success: false, 
+      error: 'Domain not found' 
+    });
+  }
+});
+
 app.post('/api/update-site', requireAuth, upload.any(), (req, res) => {
   const { domain } = req.body;
   if (!sites[domain] || sites[domain].owner !== req.user) {
